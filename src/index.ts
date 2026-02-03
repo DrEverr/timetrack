@@ -14,10 +14,12 @@ program
   .command("start")
   .description("Start tracking time")
   .argument("[title]", "optional title for the task")
-  .option("--watch [interval]", "continuously display current time (default: 1 second)", "1")
+  .option("--watch [interval]", "continuously display current time (default: 1 second)")
   .action(async (title?: string, options?: { watch?: string }) => {
     try {
-      const watchInterval = options?.watch ? parseFloat(options.watch) : undefined;
+      const watchInterval = options?.watch !== undefined 
+        ? (typeof options.watch === 'string' ? parseFloat(options.watch) : 1)
+        : undefined;
       await startTracking(title, watchInterval);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
@@ -40,10 +42,12 @@ program
 program
   .command("status")
   .description("Show current tracking status")
-  .option("--watch [interval]", "continuously refresh status (default: 1 second)", "1")
+  .option("--watch [interval]", "continuously refresh status (default: 1 second)")
   .action(async (options?: { watch?: string }) => {
     try {
-      const watchInterval = options?.watch ? parseFloat(options.watch) : undefined;
+      const watchInterval = options?.watch !== undefined 
+        ? (typeof options.watch === 'string' ? parseFloat(options.watch) : 1)
+        : undefined;
       await showStatus(watchInterval);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);

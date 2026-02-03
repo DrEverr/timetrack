@@ -52,7 +52,7 @@ export async function startTracking(title?: string, watch?: number): Promise<voi
       process.stdout.write("\x1b[2J\x1b[H");
       
       console.log(`\n  ⏱  Tracking: ${displayTitle}${elapsed}`);
-      console.log(`\n  ${clack.note("Press Ctrl+C to exit", "")}`);
+      console.log(`\n  Press Ctrl+C to exit`);
     };
     
     // Initial update
@@ -116,7 +116,7 @@ export async function showStatus(watch?: number): Promise<void> {
         console.log(`\n  ⏱  Tracking: ${titleMsg}${elapsed}`);
       }
       
-      console.log(`\n  ${clack.note("Press Ctrl+C to exit", "")}`);
+      console.log(`\n  Press Ctrl+C to exit`);
     };
     
     // Initial update
