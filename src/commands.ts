@@ -6,8 +6,9 @@ import {
   type TimeEntry,
 } from "./csv";
 import { formatElapsedTime, getCurrentUser, calculateDuration, formatDate, isToday, isThisWeek, isThisMonth, isThisYear } from "./utils";
+import * as clack from "@clack/prompts";
 
-export async function startTracking(title?: string): Promise<void> {
+export async function startTracking(title?: string, watch?: number): Promise<void> {
   const entries = await readEntries();
   const active = findActiveEntry(entries);
 
@@ -15,7 +16,7 @@ export async function startTracking(title?: string): Promise<void> {
     const titleMsg = active.entry.title
       ? ` (${active.entry.title})`
       : "";
-    console.log(`A timer is already running${titleMsg}`);
+    clack.cancel(`A timer is already running${titleMsg}`);
     process.exit(1);
   }
 
@@ -28,8 +29,50 @@ export async function startTracking(title?: string): Promise<void> {
 
   await addEntry(entry);
 
-  const titleMsg = title ? ` for "${title}"` : "";
-  console.log(`Started tracking${titleMsg}`);
+  const titleMsg = title ? ` "${title}"` : "";
+  
+  if (watch) {
+    // Watch mode - show live timer after starting
+    const interval = watch * 1000; // convert to milliseconds
+    
+    // Show started message briefly
+    const s = clack.spinner();
+    s.start(`Started tracking${titleMsg}`);
+    await new Promise(resolve => setTimeout(resolve, 800));
+    s.stop(`Tracking${titleMsg}`);
+    
+    // Clear screen and hide cursor
+    process.stdout.write("\x1b[?25l"); // hide cursor
+    
+    const updateStatus = () => {
+      const elapsed = formatElapsedTime(entry.start);
+      const displayTitle = title ? `"${title}" - ` : "";
+      
+      // Clear screen
+      process.stdout.write("\x1b[2J\x1b[H");
+      
+      console.log(`\n  ⏱  Tracking: ${displayTitle}${elapsed}`);
+      console.log(`\n  ${clack.note("Press Ctrl+C to exit", "")}`);
+    };
+    
+    // Initial update
+    updateStatus();
+    
+    // Set up interval
+    const timer = setInterval(updateStatus, interval);
+    
+    // Handle cleanup on exit
+    process.on("SIGINT", () => {
+      clearInterval(timer);
+      process.stdout.write("\x1b[?25h"); // show cursor
+      process.stdout.write("\n");
+      process.exit(0);
+    });
+    
+    return;
+  }
+  
+  clack.log.success(`Started tracking${titleMsg}`);
 }
 
 export async function stopTracking(): Promise<void> {
@@ -37,7 +80,7 @@ export async function stopTracking(): Promise<void> {
   const active = findActiveEntry(entries);
 
   if (!active) {
-    console.log("No active timer to stop");
+    clack.cancel("No active timer to stop");
     process.exit(1);
   }
 
@@ -45,15 +88,60 @@ export async function stopTracking(): Promise<void> {
 
   const elapsed = formatElapsedTime(active.entry.start);
   const titleMsg = active.entry.title ? ` "${active.entry.title}"` : "";
-  console.log(`Stopped tracking${titleMsg} (${elapsed})`);
+  clack.log.info(`Stopped tracking${titleMsg} - ${elapsed}`);
 }
 
-export async function showStatus(): Promise<void> {
+export async function showStatus(watch?: number): Promise<void> {
+  if (watch) {
+    // Watch mode - continuously update status
+    const interval = watch * 1000; // convert to milliseconds
+    
+    // Clear screen and hide cursor
+    process.stdout.write("\x1b[?25l"); // hide cursor
+    
+    const updateStatus = async () => {
+      const entries = await readEntries();
+      const active = findActiveEntry(entries);
+      
+      // Clear screen
+      process.stdout.write("\x1b[2J\x1b[H");
+      
+      if (!active) {
+        console.log("\n  ⏸  Nothing is being tracked");
+      } else {
+        const elapsed = formatElapsedTime(active.entry.start);
+        const titleMsg = active.entry.title
+          ? `"${active.entry.title}" - `
+          : "";
+        console.log(`\n  ⏱  Tracking: ${titleMsg}${elapsed}`);
+      }
+      
+      console.log(`\n  ${clack.note("Press Ctrl+C to exit", "")}`);
+    };
+    
+    // Initial update
+    await updateStatus();
+    
+    // Set up interval
+    const timer = setInterval(updateStatus, interval);
+    
+    // Handle cleanup on exit
+    process.on("SIGINT", () => {
+      clearInterval(timer);
+      process.stdout.write("\x1b[?25h"); // show cursor
+      process.stdout.write("\n");
+      process.exit(0);
+    });
+    
+    return;
+  }
+  
+  // Normal single-shot status
   const entries = await readEntries();
   const active = findActiveEntry(entries);
 
   if (!active) {
-    console.log("Nothing is being tracked");
+    clack.log.warn("Nothing is being tracked");
     return;
   }
 
@@ -61,7 +149,7 @@ export async function showStatus(): Promise<void> {
   const titleMsg = active.entry.title
     ? `"${active.entry.title}" - `
     : "";
-  console.log(`Tracking: ${titleMsg}${elapsed}`);
+  clack.log.info(`Tracking: ${titleMsg}${elapsed}`);
 }
 
 export type DateFilter = "day" | "week" | "month" | "year" | "all";
@@ -89,9 +177,13 @@ export async function listEntries(filter: DateFilter = "day"): Promise<void> {
   }
 
   if (entries.length === 0) {
-    console.log(`No time entries found for ${filter === "all" ? "all time" : `this ${filter}`}`);
+    clack.log.warn(`No time entries found for ${filter === "all" ? "all time" : `this ${filter}`}`);
     return;
   }
+
+  // Print header with clack
+  const filterLabel = filter === "all" ? "All Entries" : `This ${filter.charAt(0).toUpperCase() + filter.slice(1)}`;
+  clack.intro(`Time Entries - ${filterLabel}`);
 
   // Calculate column widths
   const userWidth = Math.max(4, ...entries.map((e) => e.user.length));
@@ -149,5 +241,5 @@ export async function listEntries(filter: DateFilter = "day"): Promise<void> {
   if (mins > 0) parts.push(`${mins}m`);
   if (parts.length === 0) parts.push("0m");
 
-  console.log(`Total: ${entries.length} entries, ${completedEntries.length} completed, ${parts.join(" ")} tracked`);
+  clack.outro(`Total: ${entries.length} entries, ${completedEntries.length} completed, ${parts.join(" ")} tracked`);
 }

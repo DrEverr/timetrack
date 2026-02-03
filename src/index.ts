@@ -14,9 +14,11 @@ program
   .command("start")
   .description("Start tracking time")
   .argument("[title]", "optional title for the task")
-  .action(async (title?: string) => {
+  .option("--watch [interval]", "continuously display current time (default: 1 second)", "1")
+  .action(async (title?: string, options?: { watch?: string }) => {
     try {
-      await startTracking(title);
+      const watchInterval = options?.watch ? parseFloat(options.watch) : undefined;
+      await startTracking(title, watchInterval);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
       process.exit(1);
@@ -38,9 +40,11 @@ program
 program
   .command("status")
   .description("Show current tracking status")
-  .action(async () => {
+  .option("--watch [interval]", "continuously refresh status (default: 1 second)", "1")
+  .action(async (options?: { watch?: string }) => {
     try {
-      await showStatus();
+      const watchInterval = options?.watch ? parseFloat(options.watch) : undefined;
+      await showStatus(watchInterval);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
       process.exit(1);
