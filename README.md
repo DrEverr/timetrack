@@ -7,6 +7,7 @@ A simple CLI tool for time tracking built with TypeScript and Bun.
 `track` is a lightweight command-line time tracker that helps you monitor how much time you spend on tasks. It uses a local CSV file to store tracking data in the current working directory, making it easy to track time across different projects.
 
 Features:
+
 - Start and stop time tracking with optional task titles
 - View current tracking status with elapsed time
 - Watch mode for live updates of status and elapsed time
@@ -17,22 +18,49 @@ Features:
 
 ## Installation
 
-### Prerequisites
-- [Bun](https://bun.sh) must be installed on your system
+### Install from npm (Recommended)
+
+Using npm:
+
+```bash
+npm install -g @heyimstas/timetracking
+```
+
+Using bun:
+
+```bash
+bun add -g @heyimstas/timetracking
+```
+
+The `track` command will now be available globally on your system.
 
 ### Install from source
 
-1. Clone or navigate to this repository:
+For development or if you want to modify the code:
+
+**Prerequisites**: [Bun](https://bun.sh) must be installed on your system
+
+1. Clone this repository:
+
 ```bash
+git clone https://github.com/HeyImStas/timetracking.git
 cd timetracking
 ```
 
 2. Install dependencies:
+
 ```bash
 bun install
 ```
 
-3. Link the CLI globally:
+3. Build the project:
+
+```bash
+bun run build
+```
+
+4. Link the CLI globally:
+
 ```bash
 bun link
 ```
@@ -42,34 +70,42 @@ The `track` command is now available globally on your system.
 ## Usage
 
 ### Start tracking
+
 Start a timer without a title:
 ```bash
 track start
 ```
 
 Start a timer with a title:
+
 ```bash
 track start "my task"
 ```
 
 Start tracking with live timer display (watch mode):
+
 ```bash
 track start "my task" --watch
 ```
 
 You can also specify a custom refresh interval in seconds:
+
 ```bash
 track start "my task" --watch 2
 ```
 
 ### Stop tracking
+
 Stop the currently running timer:
+
 ```bash
 track stop
 ```
 
 ### Check status
+
 View the current tracking status:
+
 ```bash
 track status
 ```
@@ -78,22 +114,27 @@ If a timer is running, it will show the task title (if provided) and elapsed tim
 If no timer is running, it will display "Nothing is being tracked".
 
 Watch mode (continuously refresh status):
+
 ```bash
 track status --watch
 ```
 
 You can also specify a custom refresh interval in seconds:
+
 ```bash
 track status --watch 2
 ```
 
 ### List entries
+
 Display a formatted table of time tracking entries. By default, shows entries for today:
+
 ```bash
 track list
 ```
 
 Filter entries by different time periods:
+
 ```bash
 track list --day     # Today's entries (default)
 track list --week    # This week's entries
@@ -103,6 +144,7 @@ track list --all     # All entries
 ```
 
 This command shows entries in a nicely formatted table with:
+
 - User who created the entry
 - Task title
 - Start time
