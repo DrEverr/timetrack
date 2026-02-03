@@ -1,42 +1,81 @@
 #!/usr/bin/env bun
 
-import { startTracking, stopTracking, showStatus, listEntries } from "./commands";
+import { Command } from "commander";
+import { startTracking, stopTracking, showStatus, listEntries, type DateFilter } from "./commands";
 
-async function main() {
-  const args = process.argv.slice(2);
+const program = new Command();
 
-  if (args.length === 0) {
-    console.log("Usage: track <start|stop|status|list> [title]");
-    process.exit(1);
-  }
+program
+  .name("track")
+  .description("Simple time tracking CLI")
+  .version("1.0.0");
 
-  const command = args[0];
-
-  try {
-    switch (command) {
-      case "start": {
-        const title = args[1];
-        await startTracking(title);
-        break;
-      }
-      case "stop":
-        await stopTracking();
-        break;
-      case "status":
-        await showStatus();
-        break;
-      case "list":
-        await listEntries();
-        break;
-      default:
-        console.log(`Unknown command: ${command}`);
-        console.log("Usage: track <start|stop|status|list> [title]");
-        process.exit(1);
+program
+  .command("start")
+  .description("Start tracking time")
+  .argument("[title]", "optional title for the task")
+  .action(async (title?: string) => {
+    try {
+      await startTracking(title);
+    } catch (error) {
+      console.error("Error:", error instanceof Error ? error.message : error);
+      process.exit(1);
     }
-  } catch (error) {
-    console.error("Error:", error instanceof Error ? error.message : error);
-    process.exit(1);
-  }
-}
+  });
 
-main();
+program
+  .command("stop")
+  .description("Stop tracking time")
+  .action(async () => {
+    try {
+      await stopTracking();
+    } catch (error) {
+      console.error("Error:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("status")
+  .description("Show current tracking status")
+  .action(async () => {
+    try {
+      await showStatus();
+    } catch (error) {
+      console.error("Error:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("list")
+  .description("List time entries (defaults to today)")
+  .option("-d, --day", "show entries for today")
+  .option("-w, --week", "show entries for this week")
+  .option("-m, --month", "show entries for this month")
+  .option("-y, --year", "show entries for this year")
+  .option("-a, --all", "show all entries")
+  .action(async (options) => {
+    try {
+      let filter: DateFilter = "day"; // default to today
+      
+      if (options.all) {
+        filter = "all";
+      } else if (options.year) {
+        filter = "year";
+      } else if (options.month) {
+        filter = "month";
+      } else if (options.week) {
+        filter = "week";
+      } else if (options.day) {
+        filter = "day";
+      }
+      
+      await listEntries(filter);
+    } catch (error) {
+      console.error("Error:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program.parse();

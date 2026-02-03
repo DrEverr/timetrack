@@ -5,7 +5,7 @@ import {
   findActiveEntry,
   type TimeEntry,
 } from "./csv";
-import { formatElapsedTime, getCurrentUser, calculateDuration, formatDate } from "./utils";
+import { formatElapsedTime, getCurrentUser, calculateDuration, formatDate, isToday, isThisWeek, isThisMonth, isThisYear } from "./utils";
 
 export async function startTracking(title?: string): Promise<void> {
   const entries = await readEntries();
@@ -64,11 +64,32 @@ export async function showStatus(): Promise<void> {
   console.log(`Tracking: ${titleMsg}${elapsed}`);
 }
 
-export async function listEntries(): Promise<void> {
-  const entries = await readEntries();
+export type DateFilter = "day" | "week" | "month" | "year" | "all";
+
+export async function listEntries(filter: DateFilter = "day"): Promise<void> {
+  const allEntries = await readEntries();
+
+  // Apply date filter
+  let entries = allEntries;
+  if (filter !== "all") {
+    entries = allEntries.filter((entry) => {
+      switch (filter) {
+        case "day":
+          return isToday(entry.start);
+        case "week":
+          return isThisWeek(entry.start);
+        case "month":
+          return isThisMonth(entry.start);
+        case "year":
+          return isThisYear(entry.start);
+        default:
+          return true;
+      }
+    });
+  }
 
   if (entries.length === 0) {
-    console.log("No time entries found");
+    console.log(`No time entries found for ${filter === "all" ? "all time" : `this ${filter}`}`);
     return;
   }
 
