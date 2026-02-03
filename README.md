@@ -9,6 +9,8 @@ A simple CLI tool for time tracking built with TypeScript and Bun.
 Features:
 - Start and stop time tracking with optional task titles
 - View current tracking status with elapsed time
+- Watch mode for live updates of status and elapsed time
+- Filter time entries by day, week, month, year, or all time
 - Prevents multiple concurrent timers
 - Stores data in a simple CSV format for easy access
 - Tracks username, task title, start time, and end time
@@ -50,6 +52,16 @@ Start a timer with a title:
 track start "my task"
 ```
 
+Start tracking with live timer display (watch mode):
+```bash
+track start "my task" --watch
+```
+
+You can also specify a custom refresh interval in seconds:
+```bash
+track start "my task" --watch 2
+```
+
 ### Stop tracking
 Stop the currently running timer:
 ```bash
@@ -65,13 +77,32 @@ track status
 If a timer is running, it will show the task title (if provided) and elapsed time.
 If no timer is running, it will display "Nothing is being tracked".
 
-### List all entries
-Display a formatted table of all time tracking entries:
+Watch mode (continuously refresh status):
+```bash
+track status --watch
+```
+
+You can also specify a custom refresh interval in seconds:
+```bash
+track status --watch 2
+```
+
+### List entries
+Display a formatted table of time tracking entries. By default, shows entries for today:
 ```bash
 track list
 ```
 
-This command shows all entries in a nicely formatted table with:
+Filter entries by different time periods:
+```bash
+track list --day     # Today's entries (default)
+track list --week    # This week's entries
+track list --month   # This month's entries
+track list --year    # This year's entries
+track list --all     # All entries
+```
+
+This command shows entries in a nicely formatted table with:
 - User who created the entry
 - Task title
 - Start time
@@ -110,7 +141,7 @@ Tracking: 15s
 $ track stop
 Stopped tracking (30s)
 
-# List all entries
+# List all entries for today (default)
 $ track list
 User | Title                 | Start               | End                 | Duration
 ---------------------------------------------------------------------------------
@@ -119,6 +150,15 @@ stas |                       | 2026-02-03 14:10:00 | 2026-02-03 14:10:30 | 30s
 stas | Another task          | 2026-02-03 14:15:00 | In progress         | 2m 15s  
 ---------------------------------------------------------------------------------
 Total: 3 entries, 2 completed, 6m 17s tracked
+
+# List all entries for this week
+$ track list --week
+
+# Use watch mode for live timer updates
+$ track start "Writing code" --watch
+⏱  Tracking: "Writing code" - 1m 23s
+
+Press Ctrl+C to exit
 ```
 
 ## Data Storage
