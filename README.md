@@ -131,4 +131,4 @@ stas,"Writing documentation",2026-02-03T14:00:00.000Z,2026-02-03T14:05:47.000Z
 stas,,2026-02-03T14:10:00.000Z,2026-02-03T14:10:30.000Z
 ```
 
-This makes it easy to import the data into spreadsheets or other tools for analysis.
+This makes it easy to import the data into spreadsheets or other tools for analysis. Also allows time-tracking specific projects much easier.
