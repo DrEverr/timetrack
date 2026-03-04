@@ -28,6 +28,7 @@ afterEach(() => {
 const sampleEntry: TimeEntry = {
   user: "testuser",
   title: "Test task",
+  project: "",
   start: "2025-01-15T10:00:00.000Z",
   end: "2025-01-15T11:30:00.000Z",
 };
@@ -39,14 +40,14 @@ describe("readEntries", () => {
   });
 
   it("should return empty array when file only has header", async () => {
-    writeFileSync(join(tempDir, "timetrack.csv"), "user,title,start,end\n");
+    writeFileSync(join(tempDir, "timetrack.csv"), "user,title,project,start,end\n");
     const entries = await readEntries();
     expect(entries).toEqual([]);
   });
 
   it("should parse entries from CSV file", async () => {
-    const csv = `user,title,start,end
-testuser,Test task,2025-01-15T10:00:00.000Z,2025-01-15T11:30:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,Test task,,2025-01-15T10:00:00.000Z,2025-01-15T11:30:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const entries = await readEntries();
@@ -54,51 +55,65 @@ testuser,Test task,2025-01-15T10:00:00.000Z,2025-01-15T11:30:00.000Z`;
   });
 
   it("should parse multiple entries", async () => {
-    const csv = `user,title,start,end
-user1,Task 1,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z
-user2,Task 2,2025-01-15T12:00:00.000Z,2025-01-15T13:00:00.000Z`;
+    const csv = `user,title,project,start,end
+user1,Task 1,,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z
+user2,Task 2,,2025-01-15T12:00:00.000Z,2025-01-15T13:00:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const entries = await readEntries();
     expect(entries).toHaveLength(2);
-    expect(entries[0].user).toBe("user1");
-    expect(entries[0].title).toBe("Task 1");
-    expect(entries[1].user).toBe("user2");
-    expect(entries[1].title).toBe("Task 2");
+    expect(entries[0]!.user).toBe("user1");
+    expect(entries[0]!.title).toBe("Task 1");
+    expect(entries[1]!.user).toBe("user2");
+    expect(entries[1]!.title).toBe("Task 2");
   });
 
   it("should handle entries with empty end (active timer)", async () => {
-    const csv = `user,title,start,end
-testuser,Active task,2025-01-15T10:00:00.000Z,`;
+    const csv = `user,title,project,start,end
+testuser,Active task,,,`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const entries = await readEntries();
     expect(entries).toHaveLength(1);
-    expect(entries[0].end).toBe("");
+    expect(entries[0]!.end).toBe("");
   });
 
   it("should handle quoted fields with commas", async () => {
-    const csv = `user,title,start,end
-testuser,"Task with, comma",2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,"Task with, comma",,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const entries = await readEntries();
-    expect(entries[0].title).toBe("Task with, comma");
+    expect(entries[0]!.title).toBe("Task with, comma");
   });
 
   it("should handle quoted fields with escaped quotes", async () => {
-    const csv = `user,title,start,end
-testuser,"Task with ""quotes""",2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,"Task with ""quotes""",,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const entries = await readEntries();
-    expect(entries[0].title).toBe('Task with "quotes"');
+    expect(entries[0]!.title).toBe('Task with "quotes"');
   });
 
   it("should return empty array for empty file content", async () => {
     writeFileSync(join(tempDir, "timetrack.csv"), "");
     const entries = await readEntries();
     expect(entries).toEqual([]);
+  });
+
+  it("should read legacy 4-column CSV format with backward compatibility", async () => {
+    const csv = `user,title,start,end
+testuser,Legacy task,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const entries = await readEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.user).toBe("testuser");
+    expect(entries[0]!.title).toBe("Legacy task");
+    expect(entries[0]!.project).toBe("");
+    expect(entries[0]!.start).toBe("2025-01-15T10:00:00.000Z");
+    expect(entries[0]!.end).toBe("2025-01-15T11:00:00.000Z");
   });
 });
 
@@ -108,9 +123,9 @@ describe("writeEntries", () => {
 
     const content = readFileSync(join(tempDir, "timetrack.csv"), "utf-8");
     const lines = content.trim().split("\n");
-    expect(lines[0]).toBe("user,title,start,end");
+    expect(lines[0]).toBe("user,title,project,start,end");
     expect(lines[1]).toBe(
-      "testuser,Test task,2025-01-15T10:00:00.000Z,2025-01-15T11:30:00.000Z"
+      "testuser,Test task,,2025-01-15T10:00:00.000Z,2025-01-15T11:30:00.000Z"
     );
   });
 
@@ -118,13 +133,14 @@ describe("writeEntries", () => {
     await writeEntries([]);
 
     const content = readFileSync(join(tempDir, "timetrack.csv"), "utf-8");
-    expect(content.trim()).toBe("user,title,start,end");
+    expect(content.trim()).toBe("user,title,project,start,end");
   });
 
   it("should escape fields with commas", async () => {
     const entry: TimeEntry = {
       user: "testuser",
       title: "Task, with comma",
+      project: "",
       start: "2025-01-15T10:00:00.000Z",
       end: "2025-01-15T11:00:00.000Z",
     };
@@ -138,6 +154,7 @@ describe("writeEntries", () => {
     const entry: TimeEntry = {
       user: "testuser",
       title: 'Task "important"',
+      project: "",
       start: "2025-01-15T10:00:00.000Z",
       end: "2025-01-15T11:00:00.000Z",
     };
@@ -151,6 +168,7 @@ describe("writeEntries", () => {
     const entry: TimeEntry = {
       user: "testuser",
       title: "Task\nwith newline",
+      project: "",
       start: "2025-01-15T10:00:00.000Z",
       end: "2025-01-15T11:00:00.000Z",
     };
@@ -171,14 +189,45 @@ describe("writeEntries", () => {
 
   it("should write multiple entries", async () => {
     const entries: TimeEntry[] = [
-      { user: "a", title: "T1", start: "2025-01-01T00:00:00Z", end: "2025-01-01T01:00:00Z" },
-      { user: "b", title: "T2", start: "2025-01-02T00:00:00Z", end: "2025-01-02T01:00:00Z" },
+      { user: "a", title: "T1", project: "", start: "2025-01-01T00:00:00Z", end: "2025-01-01T01:00:00Z" },
+      { user: "b", title: "T2", project: "", start: "2025-01-02T00:00:00Z", end: "2025-01-02T01:00:00Z" },
     ];
     await writeEntries(entries);
 
     const content = readFileSync(join(tempDir, "timetrack.csv"), "utf-8");
     const lines = content.trim().split("\n");
     expect(lines).toHaveLength(3); // header + 2 entries
+  });
+
+  it("should write project field correctly", async () => {
+    const entry: TimeEntry = {
+      user: "testuser",
+      title: "Task",
+      project: "myproject",
+      start: "2025-01-15T10:00:00.000Z",
+      end: "2025-01-15T11:00:00.000Z",
+    };
+    await writeEntries([entry]);
+
+    const content = readFileSync(join(tempDir, "timetrack.csv"), "utf-8");
+    const lines = content.trim().split("\n");
+    expect(lines[1]).toBe(
+      "testuser,Task,myproject,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z"
+    );
+  });
+
+  it("should escape project field with special characters", async () => {
+    const entry: TimeEntry = {
+      user: "testuser",
+      title: "Task",
+      project: "my, project",
+      start: "2025-01-15T10:00:00.000Z",
+      end: "2025-01-15T11:00:00.000Z",
+    };
+    await writeEntries([entry]);
+
+    const content = readFileSync(join(tempDir, "timetrack.csv"), "utf-8");
+    expect(content).toContain('"my, project"');
   });
 });
 
@@ -197,6 +246,7 @@ describe("addEntry", () => {
     const newEntry: TimeEntry = {
       user: "testuser",
       title: "Second task",
+      project: "",
       start: "2025-01-15T12:00:00.000Z",
       end: "2025-01-15T13:00:00.000Z",
     };
@@ -214,6 +264,7 @@ describe("updateEntry", () => {
     await addEntry({
       user: "testuser",
       title: "Active",
+      project: "",
       start: "2025-01-15T10:00:00.000Z",
       end: "",
     });
@@ -221,7 +272,7 @@ describe("updateEntry", () => {
     await updateEntry(0, { end: "2025-01-15T11:00:00.000Z" });
 
     const entries = await readEntries();
-    expect(entries[0].end).toBe("2025-01-15T11:00:00.000Z");
+    expect(entries[0]!.end).toBe("2025-01-15T11:00:00.000Z");
   });
 
   it("should preserve other fields when partially updating", async () => {
@@ -230,10 +281,10 @@ describe("updateEntry", () => {
     await updateEntry(0, { title: "Updated title" });
 
     const entries = await readEntries();
-    expect(entries[0].title).toBe("Updated title");
-    expect(entries[0].user).toBe("testuser");
-    expect(entries[0].start).toBe("2025-01-15T10:00:00.000Z");
-    expect(entries[0].end).toBe("2025-01-15T11:30:00.000Z");
+    expect(entries[0]!.title).toBe("Updated title");
+    expect(entries[0]!.user).toBe("testuser");
+    expect(entries[0]!.start).toBe("2025-01-15T10:00:00.000Z");
+    expect(entries[0]!.end).toBe("2025-01-15T11:30:00.000Z");
   });
 
   it("should do nothing when index is out of bounds (negative)", async () => {
@@ -242,7 +293,7 @@ describe("updateEntry", () => {
     await updateEntry(-1, { title: "Should not update" });
 
     const entries = await readEntries();
-    expect(entries[0].title).toBe("Test task");
+    expect(entries[0]!.title).toBe("Test task");
   });
 
   it("should do nothing when index is out of bounds (too large)", async () => {
@@ -252,20 +303,29 @@ describe("updateEntry", () => {
 
     const entries = await readEntries();
     expect(entries).toHaveLength(1);
-    expect(entries[0].title).toBe("Test task");
+    expect(entries[0]!.title).toBe("Test task");
   });
 
   it("should update the correct entry when multiple exist", async () => {
-    await addEntry({ user: "a", title: "T1", start: "s1", end: "e1" });
-    await addEntry({ user: "b", title: "T2", start: "s2", end: "e2" });
-    await addEntry({ user: "c", title: "T3", start: "s3", end: "e3" });
+    await addEntry({ user: "a", title: "T1", project: "", start: "s1", end: "e1" });
+    await addEntry({ user: "b", title: "T2", project: "", start: "s2", end: "e2" });
+    await addEntry({ user: "c", title: "T3", project: "", start: "s3", end: "e3" });
 
     await updateEntry(1, { title: "Updated T2" });
 
     const entries = await readEntries();
-    expect(entries[0].title).toBe("T1");
-    expect(entries[1].title).toBe("Updated T2");
-    expect(entries[2].title).toBe("T3");
+    expect(entries[0]!.title).toBe("T1");
+    expect(entries[1]!.title).toBe("Updated T2");
+    expect(entries[2]!.title).toBe("T3");
+  });
+
+  it("should update the project field", async () => {
+    await addEntry({ user: "a", title: "T1", project: "", start: "s1", end: "e1" });
+
+    await updateEntry(0, { project: "newproject" });
+
+    const entries = await readEntries();
+    expect(entries[0]!.project).toBe("newproject");
   });
 });
 
@@ -277,8 +337,8 @@ describe("findActiveEntry", () => {
 
   it("should return null when all entries are completed", () => {
     const entries: TimeEntry[] = [
-      { user: "a", title: "T1", start: "s1", end: "e1" },
-      { user: "b", title: "T2", start: "s2", end: "e2" },
+      { user: "a", title: "T1", project: "", start: "s1", end: "e1" },
+      { user: "b", title: "T2", project: "", start: "s2", end: "e2" },
     ];
     const result = findActiveEntry(entries);
     expect(result).toBeNull();
@@ -286,8 +346,8 @@ describe("findActiveEntry", () => {
 
   it("should find the active entry (empty end)", () => {
     const entries: TimeEntry[] = [
-      { user: "a", title: "T1", start: "s1", end: "e1" },
-      { user: "b", title: "Active", start: "s2", end: "" },
+      { user: "a", title: "T1", project: "", start: "s1", end: "e1" },
+      { user: "b", title: "Active", project: "", start: "s2", end: "" },
     ];
     const result = findActiveEntry(entries);
     expect(result).not.toBeNull();
@@ -297,9 +357,9 @@ describe("findActiveEntry", () => {
 
   it("should return the last active entry when multiple are active", () => {
     const entries: TimeEntry[] = [
-      { user: "a", title: "Active 1", start: "s1", end: "" },
-      { user: "b", title: "Completed", start: "s2", end: "e2" },
-      { user: "c", title: "Active 2", start: "s3", end: "" },
+      { user: "a", title: "Active 1", project: "", start: "s1", end: "" },
+      { user: "b", title: "Completed", project: "", start: "s2", end: "e2" },
+      { user: "c", title: "Active 2", project: "", start: "s3", end: "" },
     ];
     const result = findActiveEntry(entries);
     expect(result).not.toBeNull();
@@ -309,8 +369,8 @@ describe("findActiveEntry", () => {
 
   it("should find active entry at the beginning", () => {
     const entries: TimeEntry[] = [
-      { user: "a", title: "Active", start: "s1", end: "" },
-      { user: "b", title: "Done", start: "s2", end: "e2" },
+      { user: "a", title: "Active", project: "", start: "s1", end: "" },
+      { user: "b", title: "Done", project: "", start: "s2", end: "e2" },
     ];
     const result = findActiveEntry(entries);
     expect(result).not.toBeNull();
@@ -319,7 +379,7 @@ describe("findActiveEntry", () => {
 
   it("should find single active entry", () => {
     const entries: TimeEntry[] = [
-      { user: "a", title: "Active", start: "s1", end: "" },
+      { user: "a", title: "Active", project: "", start: "s1", end: "" },
     ];
     const result = findActiveEntry(entries);
     expect(result).not.toBeNull();
@@ -334,6 +394,7 @@ describe("CSV round-trip (write then read)", () => {
       {
         user: "user,with,commas",
         title: 'Title with "quotes"',
+        project: "",
         start: "2025-01-15T10:00:00.000Z",
         end: "2025-01-15T11:00:00.000Z",
       },
@@ -343,8 +404,8 @@ describe("CSV round-trip (write then read)", () => {
     const readBack = await readEntries();
 
     expect(readBack).toHaveLength(1);
-    expect(readBack[0].user).toBe("user,with,commas");
-    expect(readBack[0].title).toBe('Title with "quotes"');
+    expect(readBack[0]!.user).toBe("user,with,commas");
+    expect(readBack[0]!.title).toBe('Title with "quotes"');
   });
 
   it("should round-trip entries with empty fields", async () => {
@@ -352,6 +413,7 @@ describe("CSV round-trip (write then read)", () => {
       {
         user: "testuser",
         title: "",
+        project: "",
         start: "2025-01-15T10:00:00.000Z",
         end: "",
       },
@@ -361,15 +423,15 @@ describe("CSV round-trip (write then read)", () => {
     const readBack = await readEntries();
 
     expect(readBack).toHaveLength(1);
-    expect(readBack[0].title).toBe("");
-    expect(readBack[0].end).toBe("");
+    expect(readBack[0]!.title).toBe("");
+    expect(readBack[0]!.end).toBe("");
   });
 
   it("should round-trip multiple entries", async () => {
     const entries: TimeEntry[] = [
-      { user: "a", title: "Task 1", start: "2025-01-01T00:00:00Z", end: "2025-01-01T01:00:00Z" },
-      { user: "b", title: "Task 2", start: "2025-01-02T00:00:00Z", end: "" },
-      { user: "c", title: "Task, 3", start: "2025-01-03T00:00:00Z", end: "2025-01-03T02:00:00Z" },
+      { user: "a", title: "Task 1", project: "", start: "2025-01-01T00:00:00Z", end: "2025-01-01T01:00:00Z" },
+      { user: "b", title: "Task 2", project: "proj", start: "2025-01-02T00:00:00Z", end: "" },
+      { user: "c", title: "Task, 3", project: "", start: "2025-01-03T00:00:00Z", end: "2025-01-03T02:00:00Z" },
     ];
 
     await writeEntries(entries);
@@ -379,5 +441,41 @@ describe("CSV round-trip (write then read)", () => {
     expect(readBack[0]).toEqual(entries[0]);
     expect(readBack[1]).toEqual(entries[1]);
     expect(readBack[2]).toEqual(entries[2]);
+  });
+
+  it("should round-trip entries with project field", async () => {
+    const entries: TimeEntry[] = [
+      {
+        user: "testuser",
+        title: "Task",
+        project: "my-project",
+        start: "2025-01-15T10:00:00.000Z",
+        end: "2025-01-15T11:00:00.000Z",
+      },
+    ];
+
+    await writeEntries(entries);
+    const readBack = await readEntries();
+
+    expect(readBack).toHaveLength(1);
+    expect(readBack[0]!.project).toBe("my-project");
+  });
+
+  it("should round-trip entries with project containing special characters", async () => {
+    const entries: TimeEntry[] = [
+      {
+        user: "testuser",
+        title: "Task",
+        project: 'project, "special"',
+        start: "2025-01-15T10:00:00.000Z",
+        end: "2025-01-15T11:00:00.000Z",
+      },
+    ];
+
+    await writeEntries(entries);
+    const readBack = await readEntries();
+
+    expect(readBack).toHaveLength(1);
+    expect(readBack[0]!.project).toBe('project, "special"');
   });
 });

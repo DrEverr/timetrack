@@ -8,7 +8,7 @@ import {
 import { formatElapsedTime, getCurrentUser, calculateDuration, formatDate, isToday, isThisWeek, isThisMonth, isThisYear } from "./utils";
 import * as clack from "@clack/prompts";
 
-export async function startTracking(title?: string, watch?: number): Promise<void> {
+export async function startTracking(title?: string, project?: string, watch?: number): Promise<void> {
   const entries = await readEntries();
   const active = findActiveEntry(entries);
 
@@ -23,6 +23,7 @@ export async function startTracking(title?: string, watch?: number): Promise<voi
   const entry: TimeEntry = {
     user: getCurrentUser(),
     title: title || "",
+    project: project || "",
     start: new Date().toISOString(),
     end: "",
   };
@@ -30,6 +31,7 @@ export async function startTracking(title?: string, watch?: number): Promise<voi
   await addEntry(entry);
 
   const titleMsg = title ? ` "${title}"` : "";
+  const projectMsg = project ? ` [${project}]` : "";
   
   if (watch) {
     // Watch mode - show live timer after starting
@@ -37,9 +39,9 @@ export async function startTracking(title?: string, watch?: number): Promise<voi
     
     // Show started message briefly
     const s = clack.spinner();
-    s.start(`Started tracking${titleMsg}`);
+    s.start(`Started tracking${titleMsg}${projectMsg}`);
     await new Promise(resolve => setTimeout(resolve, 800));
-    s.stop(`Tracking${titleMsg}`);
+    s.stop(`Tracking${titleMsg}${projectMsg}`);
     
     // Clear screen and hide cursor
     process.stdout.write("\x1b[?25l"); // hide cursor
@@ -47,11 +49,12 @@ export async function startTracking(title?: string, watch?: number): Promise<voi
     const updateStatus = () => {
       const elapsed = formatElapsedTime(entry.start);
       const displayTitle = title ? `"${title}" - ` : "";
+      const displayProject = project ? `[${project}] ` : "";
       
       // Clear screen
       process.stdout.write("\x1b[2J\x1b[H");
       
-      console.log(`\n  ⏱  Tracking: ${displayTitle}${elapsed}`);
+      console.log(`\n  ⏱  Tracking: ${displayProject}${displayTitle}${elapsed}`);
       console.log(`\n  Press Ctrl+C to exit`);
     };
     
@@ -72,7 +75,7 @@ export async function startTracking(title?: string, watch?: number): Promise<voi
     return;
   }
   
-  clack.log.success(`Started tracking${titleMsg}`);
+  clack.log.success(`Started tracking${titleMsg}${projectMsg}`);
 }
 
 export async function stopTracking(): Promise<void> {
@@ -113,7 +116,10 @@ export async function showStatus(watch?: number): Promise<void> {
         const titleMsg = active.entry.title
           ? `"${active.entry.title}" - `
           : "";
-        console.log(`\n  ⏱  Tracking: ${titleMsg}${elapsed}`);
+        const projectMsg = active.entry.project
+          ? `[${active.entry.project}] `
+          : "";
+        console.log(`\n  ⏱  Tracking: ${projectMsg}${titleMsg}${elapsed}`);
       }
       
       console.log(`\n  Press Ctrl+C to exit`);
@@ -149,18 +155,21 @@ export async function showStatus(watch?: number): Promise<void> {
   const titleMsg = active.entry.title
     ? `"${active.entry.title}" - `
     : "";
-  clack.log.info(`Tracking: ${titleMsg}${elapsed}`);
+  const projectMsg = active.entry.project
+    ? `[${active.entry.project}] `
+    : "";
+  clack.log.info(`Tracking: ${projectMsg}${titleMsg}${elapsed}`);
 }
 
 export type DateFilter = "day" | "week" | "month" | "year" | "all";
 
-export async function listEntries(filter: DateFilter = "day"): Promise<void> {
+export async function listEntries(filter: DateFilter = "day", projectFilter?: string): Promise<void> {
   const allEntries = await readEntries();
 
   // Apply date filter
   let entries = allEntries;
   if (filter !== "all") {
-    entries = allEntries.filter((entry) => {
+    entries = entries.filter((entry) => {
       switch (filter) {
         case "day":
           return isToday(entry.start);
@@ -176,29 +185,49 @@ export async function listEntries(filter: DateFilter = "day"): Promise<void> {
     });
   }
 
+  // Apply project filter
+  if (projectFilter) {
+    entries = entries.filter((entry) =>
+      entry.project.toLowerCase() === projectFilter.toLowerCase()
+    );
+  }
+
   if (entries.length === 0) {
-    clack.log.warn(`No time entries found for ${filter === "all" ? "all time" : `this ${filter}`}`);
+    const filterMsg = filter === "all" ? "all time" : `this ${filter}`;
+    const projectMsg = projectFilter ? ` in project "${projectFilter}"` : "";
+    clack.log.warn(`No time entries found for ${filterMsg}${projectMsg}`);
     return;
   }
 
   // Print header with clack
   const filterLabel = filter === "all" ? "All Entries" : `This ${filter.charAt(0).toUpperCase() + filter.slice(1)}`;
-  clack.intro(`Time Entries - ${filterLabel}`);
+  const projectLabel = projectFilter ? ` - ${projectFilter}` : "";
+  clack.intro(`Time Entries - ${filterLabel}${projectLabel}`);
+
+  // Check if any entries have a project
+  const hasProjects = entries.some((e) => e.project);
 
   // Calculate column widths
   const userWidth = Math.max(4, ...entries.map((e) => e.user.length));
   const titleWidth = Math.max(5, ...entries.map((e) => e.title.length));
+  const projectWidth = hasProjects ? Math.max(7, ...entries.map((e) => e.project.length)) : 0;
   const dateWidth = 19; // "YYYY-MM-DD HH:MM:SS".length
   const durationWidth = 8;
 
   // Print header
-  const header = [
+  const headerParts = [
     "User".padEnd(userWidth),
     "Title".padEnd(titleWidth),
+  ];
+  if (hasProjects) {
+    headerParts.push("Project".padEnd(projectWidth));
+  }
+  headerParts.push(
     "Start".padEnd(dateWidth),
     "End".padEnd(dateWidth),
     "Duration".padEnd(durationWidth),
-  ].join(" | ");
+  );
+  const header = headerParts.join(" | ");
 
   const separator = "-".repeat(header.length);
 
@@ -207,16 +236,21 @@ export async function listEntries(filter: DateFilter = "day"): Promise<void> {
 
   // Print entries
   for (const entry of entries) {
-    const user = entry.user.padEnd(userWidth);
-    const title = entry.title.padEnd(titleWidth);
-    const start = formatDate(entry.start).padEnd(dateWidth);
-    const end = entry.end ? formatDate(entry.end).padEnd(dateWidth) : "In progress".padEnd(dateWidth);
-    const duration = entry.end
-      ? calculateDuration(entry.start, entry.end).padEnd(durationWidth)
-      : formatElapsedTime(entry.start).padEnd(durationWidth);
-
-    const row = [user, title, start, end, duration].join(" | ");
-    console.log(row);
+    const rowParts = [
+      entry.user.padEnd(userWidth),
+      entry.title.padEnd(titleWidth),
+    ];
+    if (hasProjects) {
+      rowParts.push(entry.project.padEnd(projectWidth));
+    }
+    rowParts.push(
+      formatDate(entry.start).padEnd(dateWidth),
+      entry.end ? formatDate(entry.end).padEnd(dateWidth) : "In progress".padEnd(dateWidth),
+      entry.end
+        ? calculateDuration(entry.start, entry.end).padEnd(durationWidth)
+        : formatElapsedTime(entry.start).padEnd(durationWidth),
+    );
+    console.log(rowParts.join(" | "));
   }
 
   // Print summary

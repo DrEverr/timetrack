@@ -15,13 +15,14 @@ program
   .command("start")
   .description("Start tracking time")
   .argument("[title]", "optional title for the task")
+  .option("-p, --project <name>", "assign a project to this entry")
   .option("--watch [interval]", "continuously display current time (default: 1 second)")
-  .action(async (title?: string, options?: { watch?: string }) => {
+  .action(async (title?: string, options?: { project?: string; watch?: string }) => {
     try {
       const watchInterval = options?.watch !== undefined 
         ? (typeof options.watch === 'string' ? parseFloat(options.watch) : 1)
         : undefined;
-      await startTracking(title, watchInterval);
+      await startTracking(title, options?.project, watchInterval);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
       process.exit(1);
@@ -64,6 +65,7 @@ program
   .option("-m, --month", "show entries for this month")
   .option("-y, --year", "show entries for this year")
   .option("-a, --all", "show all entries")
+  .option("-p, --project <name>", "filter by project name")
   .action(async (options) => {
     try {
       let filter: DateFilter = "day"; // default to today
@@ -80,7 +82,7 @@ program
         filter = "day";
       }
       
-      await listEntries(filter);
+      await listEntries(filter, options.project);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
       process.exit(1);

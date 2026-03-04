@@ -9,12 +9,15 @@ A simple CLI tool for time tracking built with TypeScript and Bun.
 Features:
 
 - Start and stop time tracking with optional task titles
+- Assign entries to projects with `--project` for organized tracking
 - View current tracking status with elapsed time
 - Watch mode for live updates of status and elapsed time
 - Filter time entries by day, week, month, year, or all time
+- Filter time entries by project
 - Prevents multiple concurrent timers
 - Stores data in a simple CSV format for easy access
-- Tracks username, task title, start time, and end time
+- Tracks username, task title, project, start time, and end time
+- Backward compatible with older CSV files (without project column)
 
 ## Installation
 
@@ -82,6 +85,13 @@ Start a timer with a title:
 track start "my task"
 ```
 
+Start a timer with a project:
+
+```bash
+track start "my task" --project myproject
+track start "my task" -p myproject
+```
+
 Start tracking with live timer display (watch mode):
 
 ```bash
@@ -143,10 +153,24 @@ track list --year    # This year's entries
 track list --all     # All entries
 ```
 
+Filter entries by project:
+
+```bash
+track list --all --project myproject
+track list -a -p myproject
+```
+
+You can combine project and date filters:
+
+```bash
+track list --week --project frontend
+```
+
 This command shows entries in a nicely formatted table with:
 
 - User who created the entry
 - Task title
+- Project (column auto-hides when no entries have a project)
 - Start time
 - End time (or "In progress" for active timers)
 - Duration
@@ -157,19 +181,23 @@ This command shows entries in a nicely formatted table with:
 ```bash
 # Start tracking a task
 $ track start "Writing documentation"
-Started tracking for "Writing documentation"
+Started tracking "Writing documentation"
+
+# Start tracking with a project
+$ track start "Fix login bug" -p frontend
+Started tracking "Fix login bug" [frontend]
 
 # Check the status
 $ track status
-Tracking: "Writing documentation" - 1m 23s
+Tracking: [frontend] "Fix login bug" - 1m 23s
 
 # Try to start another task (will fail)
 $ track start "Another task"
-A timer is already running (Writing documentation)
+A timer is already running (Fix login bug)
 
 # Stop the current timer
 $ track stop
-Stopped tracking "Writing documentation" (5m 47s)
+Stopped tracking "Fix login bug" - 5m 47s
 
 # Start tracking without a title
 $ track start
@@ -181,24 +209,27 @@ Tracking: 15s
 
 # Stop tracking
 $ track stop
-Stopped tracking (30s)
+Stopped tracking - 30s
 
 # List all entries for today (default)
 $ track list
-User | Title                 | Start               | End                 | Duration
----------------------------------------------------------------------------------
-stas | Writing documentation | 2026-02-03 14:00:00 | 2026-02-03 14:05:47 | 5m 47s  
-stas |                       | 2026-02-03 14:10:00 | 2026-02-03 14:10:30 | 30s     
-stas | Another task          | 2026-02-03 14:15:00 | In progress         | 2m 15s  
----------------------------------------------------------------------------------
-Total: 3 entries, 2 completed, 6m 17s tracked
+User | Title                 | Project  | Start               | End                 | Duration
+----------------------------------------------------------------------------------------------
+stas | Writing documentation |          | 2026-02-03 14:00:00 | 2026-02-03 14:05:47 | 5m 47s
+stas | Fix login bug         | frontend | 2026-02-03 14:10:00 | 2026-02-03 14:15:47 | 5m 47s
+stas | Another task          |          | 2026-02-03 14:20:00 | In progress         | 2m 15s
+----------------------------------------------------------------------------------------------
+Total: 3 entries, 2 completed, 11m 34s tracked
+
+# List entries filtered by project
+$ track list --all --project frontend
 
 # List all entries for this week
 $ track list --week
 
 # Use watch mode for live timer updates
-$ track start "Writing code" --watch
-⏱  Tracking: "Writing code" - 1m 23s
+$ track start "Writing code" -p backend --watch
+⏱  Tracking: [backend] "Writing code" - 1m 23s
 
 Press Ctrl+C to exit
 ```
@@ -208,9 +239,11 @@ Press Ctrl+C to exit
 Tracking data is stored in a `timetrack.csv` file in the **current working directory** where you run the commands. The CSV format is:
 
 ```csv
-user,title,start,end
-stas,"Writing documentation",2026-02-03T14:00:00.000Z,2026-02-03T14:05:47.000Z
-stas,,2026-02-03T14:10:00.000Z,2026-02-03T14:10:30.000Z
+user,title,project,start,end
+stas,"Writing documentation",,2026-02-03T14:00:00.000Z,2026-02-03T14:05:47.000Z
+stas,"Fix login bug",frontend,2026-02-03T14:10:00.000Z,2026-02-03T14:15:47.000Z
 ```
 
 This makes it easy to import the data into spreadsheets or other tools for analysis. Also allows time-tracking specific projects much easier.
+
+Old CSV files without the `project` column are automatically supported -- entries will be read with an empty project.

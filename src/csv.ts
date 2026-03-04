@@ -5,12 +5,13 @@ import { join } from "path";
 export interface TimeEntry {
   user: string;
   title: string;
+  project: string;
   start: string;
   end: string;
 }
 
 const CSV_FILENAME = "timetrack.csv";
-const CSV_HEADER = "user,title,start,end";
+const CSV_HEADER = "user,title,project,start,end";
 
 function getCsvPath(): string {
   return join(process.cwd(), CSV_FILENAME);
@@ -30,10 +31,29 @@ export async function readEntries(): Promise<TimeEntry[]> {
     return [];
   }
 
+  // Check if this is the old 4-column format or new 5-column format
+  const header = lines[0];
+  const isLegacy = header === "user,title,start,end";
+
   // Skip header
   return lines.slice(1).map((line) => {
-    const [user, title, start, end] = parseCSVLine(line);
-    return { user, title, start, end };
+    const fields = parseCSVLine(line);
+    if (isLegacy) {
+      return {
+        user: fields[0] ?? "",
+        title: fields[1] ?? "",
+        project: "",
+        start: fields[2] ?? "",
+        end: fields[3] ?? "",
+      };
+    }
+    return {
+      user: fields[0] ?? "",
+      title: fields[1] ?? "",
+      project: fields[2] ?? "",
+      start: fields[3] ?? "",
+      end: fields[4] ?? "",
+    };
   });
 }
 
@@ -60,7 +80,7 @@ export async function updateEntry(
 ): Promise<void> {
   const entries = await readEntries();
   if (index >= 0 && index < entries.length) {
-    entries[index] = { ...entries[index], ...updates };
+    entries[index] = { ...entries[index]!, ...updates };
     await writeEntries(entries);
   }
 }
@@ -70,8 +90,8 @@ export function findActiveEntry(entries: TimeEntry[]): {
   index: number;
 } | null {
   for (let i = entries.length - 1; i >= 0; i--) {
-    if (!entries[i].end) {
-      return { entry: entries[i], index: i };
+    if (!entries[i]!.end) {
+      return { entry: entries[i]!, index: i };
     }
   }
   return null;
@@ -111,6 +131,7 @@ function formatCSVLine(entry: TimeEntry): string {
   return [
     escapeCSVField(entry.user),
     escapeCSVField(entry.title),
+    escapeCSVField(entry.project),
     entry.start,
     entry.end,
   ].join(",");

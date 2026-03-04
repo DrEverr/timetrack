@@ -105,6 +105,38 @@ describe("startTracking", () => {
     const output = stdout + stderr;
     expect(output).toContain("Started tracking");
   });
+
+  it("should create entry with project when --project flag is used", async () => {
+    const { exitCode } = await runCLI("start", "My task", "--project", "frontend");
+    expect(exitCode).toBe(0);
+
+    const entries = await getEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.title).toBe("My task");
+    expect(entries[0]!.project).toBe("frontend");
+  });
+
+  it("should create entry with project using -p shorthand", async () => {
+    const { exitCode } = await runCLI("start", "My task", "-p", "backend");
+    expect(exitCode).toBe(0);
+
+    const entries = await getEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.project).toBe("backend");
+  });
+
+  it("should create entry with empty project when no --project flag", async () => {
+    await runCLI("start", "My task");
+
+    const entries = await getEntries();
+    expect(entries[0]!.project).toBe("");
+  });
+
+  it("should show project in started message", async () => {
+    const { stdout, stderr } = await runCLI("start", "My task", "-p", "frontend");
+    const output = stdout + stderr;
+    expect(output).toContain("[frontend]");
+  });
 });
 
 describe("stopTracking", () => {
@@ -145,9 +177,9 @@ describe("stopTracking", () => {
   });
 
   it("should stop only the active timer when multiple entries exist", async () => {
-    const csv = `user,title,start,end
-user1,Done task,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z
-user1,Active task,2025-01-15T12:00:00.000Z,`;
+    const csv = `user,title,project,start,end
+user1,Done task,,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z
+user1,Active task,,2025-01-15T12:00:00.000Z,`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { exitCode } = await runCLI("stop");
@@ -198,6 +230,13 @@ describe("showStatus", () => {
     const output = stdout + stderr;
     expect(output).toContain("Tracking:");
   });
+
+  it("should show project in status when project exists", async () => {
+    await runCLI("start", "My task", "-p", "frontend");
+    const { stdout, stderr } = await runCLI("status");
+    const output = stdout + stderr;
+    expect(output).toContain("[frontend]");
+  });
 });
 
 describe("listEntries", () => {
@@ -235,8 +274,8 @@ describe("listEntries", () => {
   it("should list entries for today", async () => {
     const noon = todayNoon();
     const end = new Date(noon.getTime() + 3600000);
-    const csv = `user,title,start,end
-testuser,Today task,${noon.toISOString()},${end.toISOString()}`;
+    const csv = `user,title,project,start,end
+testuser,Today task,,${noon.toISOString()},${end.toISOString()}`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { exitCode, stdout, stderr } = await runCLI("list", "-d");
@@ -247,8 +286,8 @@ testuser,Today task,${noon.toISOString()},${end.toISOString()}`;
   });
 
   it("should filter out entries from other days when filter is 'day'", async () => {
-    const csv = `user,title,start,end
-testuser,Yesterday task,2025-06-10T10:00:00.000Z,2025-06-10T11:00:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,Yesterday task,,2025-06-10T10:00:00.000Z,2025-06-10T11:00:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-d");
@@ -257,8 +296,8 @@ testuser,Yesterday task,2025-06-10T10:00:00.000Z,2025-06-10T11:00:00.000Z`;
   });
 
   it("should show all entries when filter is 'all'", async () => {
-    const csv = `user,title,start,end
-testuser,Old task,2020-01-01T10:00:00.000Z,2020-01-01T11:00:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,Old task,,2020-01-01T10:00:00.000Z,2020-01-01T11:00:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-a");
@@ -269,8 +308,8 @@ testuser,Old task,2020-01-01T10:00:00.000Z,2020-01-01T11:00:00.000Z`;
 
   it("should display 'In progress' for active entries", async () => {
     const noon = todayNoon();
-    const csv = `user,title,start,end
-testuser,Active task,${noon.toISOString()},`;
+    const csv = `user,title,project,start,end
+testuser,Active task,,${noon.toISOString()},`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-d");
@@ -284,9 +323,9 @@ testuser,Active task,${noon.toISOString()},`;
     const t1End   = new Date(noon.getTime() - 3600000); // noon - 1h (1h duration)
     const t2Start = new Date(noon.getTime() - 1800000); // noon - 30m
     const t2End   = noon;                               // noon (30m duration)
-    const csv = `user,title,start,end
-testuser,Task 1,${t1Start.toISOString()},${t1End.toISOString()}
-testuser,Task 2,${t2Start.toISOString()},${t2End.toISOString()}`;
+    const csv = `user,title,project,start,end
+testuser,Task 1,,${t1Start.toISOString()},${t1End.toISOString()}
+testuser,Task 2,,${t2Start.toISOString()},${t2End.toISOString()}`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-d");
@@ -299,8 +338,8 @@ testuser,Task 2,${t2Start.toISOString()},${t2End.toISOString()}`;
   it("should show 0m when total duration is less than a minute", async () => {
     const noon = todayNoon();
     const end = new Date(noon.getTime() + 10000); // +10s
-    const csv = `user,title,start,end
-testuser,Quick task,${noon.toISOString()},${end.toISOString()}`;
+    const csv = `user,title,project,start,end
+testuser,Quick task,,${noon.toISOString()},${end.toISOString()}`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-d");
@@ -309,8 +348,8 @@ testuser,Quick task,${noon.toISOString()},${end.toISOString()}`;
   });
 
   it("should display header with User and Title columns", async () => {
-    const csv = `user,title,start,end
-testuser,Task,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,Task,,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-a");
@@ -320,8 +359,8 @@ testuser,Task,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
   });
 
   it("should display separator line in table", async () => {
-    const csv = `user,title,start,end
-testuser,Task,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,Task,,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-a");
@@ -332,8 +371,8 @@ testuser,Task,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
   it("should list entries for this week", async () => {
     const noon = todayNoon();
     const end = new Date(noon.getTime() + 3600000);
-    const csv = `user,title,start,end
-testuser,This week task,${noon.toISOString()},${end.toISOString()}`;
+    const csv = `user,title,project,start,end
+testuser,This week task,,${noon.toISOString()},${end.toISOString()}`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-w");
@@ -344,8 +383,8 @@ testuser,This week task,${noon.toISOString()},${end.toISOString()}`;
   it("should list entries for this month", async () => {
     const noon = todayNoon();
     const end = new Date(noon.getTime() + 3600000);
-    const csv = `user,title,start,end
-testuser,This month task,${noon.toISOString()},${end.toISOString()}`;
+    const csv = `user,title,project,start,end
+testuser,This month task,,${noon.toISOString()},${end.toISOString()}`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-m");
@@ -356,8 +395,8 @@ testuser,This month task,${noon.toISOString()},${end.toISOString()}`;
   it("should list entries for this year", async () => {
     const noon = todayNoon();
     const end = new Date(noon.getTime() + 3600000);
-    const csv = `user,title,start,end
-testuser,This year task,${noon.toISOString()},${end.toISOString()}`;
+    const csv = `user,title,project,start,end
+testuser,This year task,,${noon.toISOString()},${end.toISOString()}`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-y");
@@ -366,8 +405,8 @@ testuser,This year task,${noon.toISOString()},${end.toISOString()}`;
   });
 
   it("should show hours and minutes in total when applicable", async () => {
-    const csv = `user,title,start,end
-testuser,Long task,2025-06-15T10:00:00.000Z,2025-06-15T11:30:00.000Z`;
+    const csv = `user,title,project,start,end
+testuser,Long task,,2025-06-15T10:00:00.000Z,2025-06-15T11:30:00.000Z`;
     writeFileSync(join(tempDir, "timetrack.csv"), csv);
 
     const { stdout, stderr } = await runCLI("list", "-a");
@@ -380,5 +419,69 @@ testuser,Long task,2025-06-15T10:00:00.000Z,2025-06-15T11:30:00.000Z`;
     const { stdout, stderr } = await runCLI("list");
     const output = stdout + stderr;
     expect(output).toContain("this day");
+  });
+
+  it("should show Project column when entries have projects", async () => {
+    const csv = `user,title,project,start,end
+testuser,Task,frontend,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const { stdout, stderr } = await runCLI("list", "-a");
+    const output = stdout + stderr;
+    expect(output).toContain("Project");
+    expect(output).toContain("frontend");
+  });
+
+  it("should not show Project column when no entries have projects", async () => {
+    const csv = `user,title,project,start,end
+testuser,Task,,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const { stdout, stderr } = await runCLI("list", "-a");
+    const output = stdout + stderr;
+    expect(output).not.toContain("Project");
+  });
+
+  it("should filter entries by project with --project flag", async () => {
+    const csv = `user,title,project,start,end
+testuser,Frontend task,frontend,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z
+testuser,Backend task,backend,2025-06-15T12:00:00.000Z,2025-06-15T13:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const { stdout, stderr } = await runCLI("list", "-a", "-p", "frontend");
+    const output = stdout + stderr;
+    expect(output).toContain("Frontend task");
+    expect(output).not.toContain("Backend task");
+  });
+
+  it("should filter entries by project case-insensitively", async () => {
+    const csv = `user,title,project,start,end
+testuser,Task,Frontend,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const { stdout, stderr } = await runCLI("list", "-a", "-p", "frontend");
+    const output = stdout + stderr;
+    expect(output).toContain("Task");
+  });
+
+  it("should show project name in list header when filtering by project", async () => {
+    const csv = `user,title,project,start,end
+testuser,Task,frontend,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const { stdout, stderr } = await runCLI("list", "-a", "-p", "frontend");
+    const output = stdout + stderr;
+    expect(output).toContain("frontend");
+  });
+
+  it("should show no entries message when project filter matches nothing", async () => {
+    const csv = `user,title,project,start,end
+testuser,Task,frontend,2025-06-15T10:00:00.000Z,2025-06-15T11:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const { stdout, stderr } = await runCLI("list", "-a", "-p", "nonexistent");
+    const output = stdout + stderr;
+    expect(output).toContain("No time entries found");
+    expect(output).toContain("nonexistent");
   });
 });
