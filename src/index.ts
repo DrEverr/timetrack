@@ -2,13 +2,14 @@
 
 import { Command } from "commander";
 import { startTracking, stopTracking, showStatus, listEntries, type DateFilter } from "./commands";
+import pkg from "../package.json";
 
 const program = new Command();
 
 program
   .name("track")
-  .description("Simple time tracking CLI")
-  .version("1.0.0");
+  .description("Minimal, zero-config CLI time tracker.")
+  .version(pkg.version);
 
 program
   .command("start")
