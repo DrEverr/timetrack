@@ -97,6 +97,18 @@ export function findActiveEntry(entries: TimeEntry[]): {
   return null;
 }
 
+export function findLastCompletedEntry(entries: TimeEntry[]): {
+  entry: TimeEntry;
+  index: number;
+} | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i]!.end) {
+      return { entry: entries[i]!, index: i };
+    }
+  }
+  return null;
+}
+
 // CSV parsing helpers
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];

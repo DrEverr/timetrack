@@ -1,6 +1,6 @@
 # track
 
-A simple CLI tool for time tracking built with TypeScript and Bun.
+Minimal CLI time tracker tool built with TypeScript and Bun.
 
 ## Description
 
@@ -9,9 +9,10 @@ A simple CLI tool for time tracking built with TypeScript and Bun.
 Features:
 
 - Start and stop time tracking with optional task titles
+- Resume the last stopped timer with a single command
 - Assign entries to projects with `--project` for organized tracking
 - View current tracking status with elapsed time
-- Watch mode for live updates of status and elapsed time
+- Watch mode with interactive keyboard controls (stop, resume, quit)
 - Filter time entries by day, week, month, year, or all time
 - Filter time entries by project
 - Prevents multiple concurrent timers
@@ -46,8 +47,8 @@ For development or if you want to modify the code:
 1. Clone this repository:
 
 ```bash
-git clone https://github.com/HeyImStas/timetracking.git
-cd timetracking
+git clone https://github.com/DrEverr/timetrack.git
+cd timetrack
 ```
 
 2. Install dependencies:
@@ -112,6 +113,26 @@ Stop the currently running timer:
 track stop
 ```
 
+### Resume tracking
+
+Restart the last stopped timer with the same title and project:
+
+```bash
+track resume
+```
+
+You can also use the `continue` alias:
+
+```bash
+track continue
+```
+
+Resume with watch mode:
+
+```bash
+track resume --watch
+```
+
 ### Check status
 
 View the current tracking status:
@@ -135,6 +156,16 @@ You can also specify a custom refresh interval in seconds:
 track status --watch 2
 ```
 
+### Watch mode keyboard controls
+
+When using `--watch` with any command, interactive keyboard controls are available:
+
+| Key | Action |
+|-----|--------|
+| `s` | Stop the current timer |
+| `r` | Resume the last stopped timer |
+| `q` / `Ctrl+C` | Exit watch mode |
+
 ### List entries
 
 Display a formatted table of time tracking entries. By default, shows entries for today:
@@ -146,11 +177,11 @@ track list
 Filter entries by different time periods:
 
 ```bash
-track list --day     # Today's entries (default)
-track list --week    # This week's entries
-track list --month   # This month's entries
-track list --year    # This year's entries
-track list --all     # All entries
+track list -d, --day     # Today's entries (default)
+track list -w, --week    # This week's entries
+track list -m, --month   # This month's entries
+track list -y, --year    # This year's entries
+track list -a, --all     # All entries
 ```
 
 Filter entries by project:
@@ -199,6 +230,10 @@ A timer is already running (Fix login bug)
 $ track stop
 Stopped tracking "Fix login bug" - 5m 47s
 
+# Resume the last timer
+$ track resume
+Started tracking "Fix login bug" [frontend]
+
 # Start tracking without a title
 $ track start
 Started tracking
@@ -227,11 +262,14 @@ $ track list --all --project frontend
 # List all entries for this week
 $ track list --week
 
-# Use watch mode for live timer updates
+# Use watch mode with interactive controls
 $ track start "Writing code" -p backend --watch
-⏱  Tracking: [backend] "Writing code" - 1m 23s
+⏱  Tracking: [backend] "Writing code" - 1m 23s  [s] stop  [q] quit
 
-Press Ctrl+C to exit
+# Press 's' to stop the timer without leaving watch mode
+⏸  Nothing is being tracked  [r] resume  [q] quit
+
+# Press 'r' to resume, 'q' or Ctrl+C to exit
 ```
 
 ## Data Storage
@@ -247,3 +285,7 @@ stas,"Fix login bug",frontend,2026-02-03T14:10:00.000Z,2026-02-03T14:15:47.000Z
 This makes it easy to import the data into spreadsheets or other tools for analysis. Also allows time-tracking specific projects much easier.
 
 Old CSV files without the `project` column are automatically supported -- entries will be read with an empty project.
+
+## License
+
+MIT

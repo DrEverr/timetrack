@@ -1,8 +1,19 @@
 #!/usr/bin/env bun
 
 import { Command } from "commander";
-import { startTracking, stopTracking, showStatus, listEntries, type DateFilter } from "./commands";
+import { startTracking, stopTracking, resumeTracking, showStatus, listEntries, type DateFilter } from "./commands";
 import pkg from "../package.json";
+
+/**
+ * Parse the --watch option value into a validated interval (in seconds).
+ * --watch with no value: commander passes `true`
+ */
+function parseInterval(interval?: string | boolean): number | undefined {
+  if (interval === undefined) return undefined;
+  if (typeof interval !== "string") return 1;
+  const parsed = parseFloat(interval);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
 
 const program = new Command();
 
@@ -19,9 +30,7 @@ program
   .option("--watch [interval]", "continuously display current time (default: 1 second)")
   .action(async (title?: string, options?: { project?: string; watch?: string }) => {
     try {
-      const watchInterval = options?.watch !== undefined 
-        ? (typeof options.watch === 'string' ? parseFloat(options.watch) : 1)
-        : undefined;
+      const watchInterval = parseInterval(options?.watch);
       await startTracking(title, options?.project, watchInterval);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
@@ -42,14 +51,27 @@ program
   });
 
 program
+  .command("resume")
+  .alias("continue")
+  .description("Restart the last stopped timer")
+  .option("--watch [interval]", "continuously display current time (default: 1 second)")
+  .action(async (options?: { watch?: string }) => {
+    try {
+      const watchInterval = parseInterval(options?.watch);
+      await resumeTracking(watchInterval);
+    } catch (error) {
+      console.error("Error:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
+
+program
   .command("status")
   .description("Show current tracking status")
   .option("--watch [interval]", "continuously refresh status (default: 1 second)")
   .action(async (options?: { watch?: string }) => {
     try {
-      const watchInterval = options?.watch !== undefined 
-        ? (typeof options.watch === 'string' ? parseFloat(options.watch) : 1)
-        : undefined;
+      const watchInterval = parseInterval(options?.watch);
       await showStatus(watchInterval);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);
@@ -69,7 +91,7 @@ program
   .action(async (options) => {
     try {
       let filter: DateFilter = "day"; // default to today
-      
+
       if (options.all) {
         filter = "all";
       } else if (options.year) {
@@ -81,7 +103,7 @@ program
       } else if (options.day) {
         filter = "day";
       }
-      
+
       await listEntries(filter, options.project);
     } catch (error) {
       console.error("Error:", error instanceof Error ? error.message : error);

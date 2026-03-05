@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { readEntries, findActiveEntry, type TimeEntry } from "./csv";
+import { readEntries, findActiveEntry, findLastCompletedEntry, type TimeEntry } from "./csv";
 
 let tempDir: string;
 const srcDir = import.meta.dir;
@@ -190,6 +190,129 @@ user1,Active task,,2025-01-15T12:00:00.000Z,`;
     expect(entries[0]!.end).toBe("2025-01-15T11:00:00.000Z");
     expect(entries[1]!.end).toBeTruthy();
     expect(entries[1]!.end).not.toBe("");
+  });
+});
+
+describe("resumeTracking", () => {
+  it("should resume the last stopped timer with same title", async () => {
+    await runCLI("start", "My task");
+    await runCLI("stop");
+    const { exitCode } = await runCLI("resume");
+    expect(exitCode).toBe(0);
+
+    const entries = await getEntries();
+    expect(entries).toHaveLength(2);
+    expect(entries[1]!.title).toBe("My task");
+    expect(entries[1]!.end).toBe("");
+  });
+
+  it("should resume the last stopped timer with same project", async () => {
+    await runCLI("start", "My task", "-p", "frontend");
+    await runCLI("stop");
+    const { exitCode } = await runCLI("resume");
+    expect(exitCode).toBe(0);
+
+    const entries = await getEntries();
+    expect(entries).toHaveLength(2);
+    expect(entries[1]!.title).toBe("My task");
+    expect(entries[1]!.project).toBe("frontend");
+  });
+
+  it("should exit with error when no previous timer exists", async () => {
+    const { exitCode } = await runCLI("resume");
+    expect(exitCode).toBe(1);
+  });
+
+  it("should show error message when no previous timer exists", async () => {
+    const { stdout, stderr } = await runCLI("resume");
+    const output = stdout + stderr;
+    expect(output).toContain("No previous timer");
+  });
+
+  it("should exit with error when a timer is already running", async () => {
+    await runCLI("start", "Running task");
+    const { exitCode } = await runCLI("resume");
+    expect(exitCode).toBe(1);
+  });
+
+  it("should show error about already running timer", async () => {
+    await runCLI("start", "Running task");
+    const { stdout, stderr } = await runCLI("resume");
+    const output = stdout + stderr;
+    expect(output).toContain("already running");
+  });
+
+  it("should resume the most recent completed timer, not an older one", async () => {
+    const csv = `user,title,project,start,end
+user1,Old task,backend,2025-01-15T10:00:00.000Z,2025-01-15T11:00:00.000Z
+user1,Latest task,frontend,2025-01-15T12:00:00.000Z,2025-01-15T13:00:00.000Z`;
+    writeFileSync(join(tempDir, "timetrack.csv"), csv);
+
+    const { exitCode } = await runCLI("resume");
+    expect(exitCode).toBe(0);
+
+    const entries = await getEntries();
+    expect(entries).toHaveLength(3);
+    expect(entries[2]!.title).toBe("Latest task");
+    expect(entries[2]!.project).toBe("frontend");
+    expect(entries[2]!.end).toBe("");
+  });
+
+  it("should work with 'continue' alias", async () => {
+    await runCLI("start", "My task");
+    await runCLI("stop");
+    const { exitCode } = await runCLI("continue");
+    expect(exitCode).toBe(0);
+
+    const entries = await getEntries();
+    expect(entries).toHaveLength(2);
+    expect(entries[1]!.title).toBe("My task");
+    expect(entries[1]!.end).toBe("");
+  });
+
+  it("should show started message on resume", async () => {
+    await runCLI("start", "My task");
+    await runCLI("stop");
+    const { stdout, stderr } = await runCLI("resume");
+    const output = stdout + stderr;
+    expect(output).toContain("Started tracking");
+  });
+
+  it("should resume a timer with no title", async () => {
+    await runCLI("start");
+    await runCLI("stop");
+    const { exitCode } = await runCLI("resume");
+    expect(exitCode).toBe(0);
+
+    const entries = await getEntries();
+    expect(entries).toHaveLength(2);
+    expect(entries[1]!.title).toBe("");
+    expect(entries[1]!.end).toBe("");
+  });
+});
+
+describe("findLastCompletedEntry", () => {
+  it("should return null for empty entries", () => {
+    expect(findLastCompletedEntry([])).toBeNull();
+  });
+
+  it("should return null when all entries are active", () => {
+    const entries: TimeEntry[] = [
+      { user: "u", title: "t", project: "", start: "2025-01-01T00:00:00Z", end: "" },
+    ];
+    expect(findLastCompletedEntry(entries)).toBeNull();
+  });
+
+  it("should return the last completed entry", () => {
+    const entries: TimeEntry[] = [
+      { user: "u", title: "first", project: "", start: "2025-01-01T10:00:00Z", end: "2025-01-01T11:00:00Z" },
+      { user: "u", title: "second", project: "", start: "2025-01-01T12:00:00Z", end: "2025-01-01T13:00:00Z" },
+      { user: "u", title: "active", project: "", start: "2025-01-01T14:00:00Z", end: "" },
+    ];
+    const result = findLastCompletedEntry(entries);
+    expect(result).not.toBeNull();
+    expect(result!.entry.title).toBe("second");
+    expect(result!.index).toBe(1);
   });
 });
 

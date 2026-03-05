@@ -68,19 +68,19 @@ export function isToday(isoString: string): boolean {
 export function isThisWeek(isoString: string): boolean {
   const date = new Date(isoString);
   const today = new Date();
-  
+
   // Get start of week (Monday)
   const startOfWeek = new Date(today);
   const day = today.getDay();
   const diff = day === 0 ? -6 : 1 - day; // Sunday is 0, Monday is 1
   startOfWeek.setDate(today.getDate() + diff);
   startOfWeek.setHours(0, 0, 0, 0);
-  
+
   // Get end of week (Sunday)
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(startOfWeek.getDate() + 6);
   endOfWeek.setHours(23, 59, 59, 999);
-  
+
   return date >= startOfWeek && date <= endOfWeek;
 }
 
