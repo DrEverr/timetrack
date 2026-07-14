@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import { stripAnsi } from "./colors";
 import { readEntriesAt, writeEntriesAt, type TimeEntry } from "./csv";
 import { dispatchReplLine, parseCdTarget, promptFor, type ReplIO, type ReplSession } from "./repl";
 
@@ -98,7 +99,7 @@ describe("dispatchReplLine", () => {
     expect(result).toBe("continue");
     expect(session.entry.title).toBe("Build export");
     expect(entries[0]!.title).toBe("Build export");
-    expect(output[0]).toBe("Name: Build export");
+    expect(stripAnsi(output[0]!)).toBe("Name: Build export");
   });
 
   it("should update the tracked project", async () => {
@@ -144,16 +145,41 @@ describe("dispatchReplLine", () => {
 
     expect(calls).toEqual([{ command: "echo hello", cwd: tempDir }]);
   });
+
+  it("should print aligned help text", async () => {
+    await dispatchReplLine("/help", session, io);
+    const help = stripAnsi(output[0]!);
+
+    expect(help).toContain("Commands:");
+    expect(help).toContain("/project <name>  set or clear the project");
+    expect(help).toContain("Any other line runs in your shell");
+  });
 });
 
 describe("promptFor", () => {
   it("should show dot for the base directory", () => {
-    expect(promptFor(session)).toContain("track .>");
+    expect(stripAnsi(promptFor(session))).toContain("track .>");
   });
 
   it("should show the current relative directory after cd", () => {
     session.cwd = join(tempDir, "subdir");
-    expect(promptFor(session)).toContain("track subdir>");
+    expect(stripAnsi(promptFor(session))).toContain("track subdir>");
+  });
+
+  it("should include ansi hierarchy in the prompt", () => {
+    expect(promptFor(session)).toContain("\x1b[36m");
+    expect(promptFor(session)).toContain("\x1b[36m●");
+    expect(promptFor(session)).toContain("\x1b[1m");
+    expect(promptFor(session)).toContain("\x1b[2m");
+  });
+
+  it("should highlight status time", async () => {
+    await dispatchReplLine("/status", session, io);
+    const statusLine = output[0]!;
+
+    expect(statusLine).toContain("\x1b[36m");
+    expect(statusLine).toContain("\x1b[1m");
+    expect(stripAnsi(statusLine)).toContain("Tracking:");
   });
 });
 
@@ -182,7 +208,7 @@ describe("runRepl signals", () => {
       proc.kill("SIGTERM");
     }
     expect(entry).toBeDefined();
-    expect(await waitForText(() => stdout, "track .>")).toBe(true);
+    expect(await waitForText(() => stripAnsi(stdout), "track .>")).toBe(true);
 
     proc.kill("SIGINT");
     const exitCode = await proc.exited;

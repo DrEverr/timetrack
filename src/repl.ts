@@ -10,6 +10,7 @@ import {
   updateEntrySync,
   type TimeEntry,
 } from "./csv";
+import { c } from "./colors";
 import { listEntries } from "./commands";
 import { formatElapsedCompact, formatElapsedTime, getCurrentUser } from "./utils";
 
@@ -34,6 +35,8 @@ const consoleIO: ReplIO = {
   write: (message) => console.log(message),
   error: (message) => console.error(message),
 };
+
+const RECORDING_INDICATOR = c.cyan("●");
 
 function expandHome(path: string): string {
   if (path === "~") return homedir();
@@ -74,23 +77,31 @@ async function withCwd<T>(cwd: string, fn: () => Promise<T>): Promise<T> {
 }
 
 function printHelp(io: ReplIO): void {
+  const rows = [
+    ["/name <title>", "set or clear the tracked task title"],
+    ["/project <name>", "set or clear the project"],
+    ["/status", "show the current timer"],
+    ["/list", "list today's entries for this session directory"],
+    ["/help", "show this help"],
+    ["/quit", "stop tracking and exit"],
+  ] as const;
+  const commandWidth = Math.max(...rows.map(([command]) => command.length));
+
   io.write([
-    "Commands:",
-    "  /name <title>       set or clear the tracked task title",
-    "  /project <name>     set or clear the project",
-    "  /status             show the current timer",
-    "  /list               list today's entries for this session directory",
-    "  /help               show this help",
-    "  /quit               stop tracking and exit",
+    c.bold("Commands:"),
+    ...rows.map(([command, description]) =>
+      `  ${c.cyan(command.padEnd(commandWidth))}  ${c.dim(description)}`
+    ),
     "",
-    "Any other line runs in your shell. cd changes the REPL working directory.",
+    c.dim("Any other line runs in your shell. cd changes the REPL working directory."),
   ].join("\n"));
 }
 
 function printStatus(session: ReplSession, io: ReplIO): void {
-  const project = session.entry.project ? `[${session.entry.project}] ` : "";
-  const title = session.entry.title ? `"${session.entry.title}" - ` : "";
-  io.write(`Tracking: ${project}${title}${formatElapsedTime(session.entry.start)}`);
+  const project = session.entry.project ? c.dim(`[${session.entry.project}] `) : "";
+  const title = session.entry.title ? c.dim(`"${session.entry.title}" - `) : "";
+  const elapsed = c.bold(c.cyan(formatElapsedTime(session.entry.start)));
+  io.write(`${RECORDING_INDICATOR} ${c.dim("Tracking:")} ${project}${title}${elapsed}`);
 }
 
 export async function dispatchReplLine(
@@ -114,13 +125,13 @@ export async function dispatchReplLine(
       case "title":
         session.entry = { ...session.entry, title: value };
         updateEntrySync(session.baseDir, session.entryIndex, { title: value });
-        io.write(value ? `Name: ${value}` : "Name cleared");
+        io.write(value ? `${c.dim("Name:")} ${c.cyan(value)}` : c.yellow("Name cleared"));
         return "continue";
 
       case "project":
         session.entry = { ...session.entry, project: value };
         updateEntrySync(session.baseDir, session.entryIndex, { project: value });
-        io.write(value ? `Project: ${value}` : "Project cleared");
+        io.write(value ? `${c.dim("Project:")} ${c.cyan(value)}` : c.yellow("Project cleared"));
         return "continue";
 
       case "status":
@@ -141,7 +152,7 @@ export async function dispatchReplLine(
         return "quit";
 
       default:
-        io.error(`Unknown command: /${command}`);
+        io.error(c.red(`Unknown command: /${command}`));
         return "continue";
     }
   }
@@ -149,7 +160,7 @@ export async function dispatchReplLine(
   const cdTarget = parseCdTarget(line, session.cwd, session.previousCwd);
   if (cdTarget) {
     if (!existsSync(cdTarget)) {
-      io.error(`cd: no such directory: ${cdTarget}`);
+      io.error(c.red(`cd: no such directory: ${cdTarget}`));
       return "continue";
     }
 
@@ -172,7 +183,7 @@ export function promptFor(session: ReplSession): string {
     : relativeCwd.startsWith("..")
       ? session.cwd
       : relativeCwd;
-  return `[${formatElapsedCompact(session.entry.start)}] track ${cwdLabel}> `;
+  return `${c.bold(c.cyan(`[${formatElapsedCompact(session.entry.start)}]`))} ${RECORDING_INDICATOR} ${c.dim("track")} ${c.dim(cwdLabel)}${c.dim(">")} `;
 }
 
 function suspend(rl: Interface): void {
@@ -201,7 +212,7 @@ export async function runRepl(options: { title?: string; project?: string } = {}
       entryIndex: active.index,
       entry: active.entry,
     };
-    console.log(`Attached to active timer${active.entry.title ? ` "${active.entry.title}"` : ""}`);
+    console.log(c.dim(`Attached to active timer${active.entry.title ? ` "${active.entry.title}"` : ""}`));
   } else {
     const entry: TimeEntry = {
       user: getCurrentUser(),
@@ -214,7 +225,7 @@ export async function runRepl(options: { title?: string; project?: string } = {}
     session = { baseDir, cwd: baseDir, entryIndex, entry };
     const title = entry.title ? ` "${entry.title}"` : "";
     const project = entry.project ? ` [${entry.project}]` : "";
-    console.log(`Started tracking${title}${project}`);
+    console.log(`${RECORDING_INDICATOR} ${c.dim(`Started tracking${title}${project}`)}`);
   }
 
   let finalized = false;
