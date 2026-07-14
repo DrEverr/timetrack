@@ -1,6 +1,6 @@
 {
   "name": "@heyimstas/timetracking",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Minimal time tracking CLI tool",
   "author": "HeyImStas",
   "license": "MIT",
