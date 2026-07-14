@@ -7,6 +7,8 @@ import {
   writeEntries,
   addEntry,
   updateEntry,
+  updateEntrySync,
+  finalizeEntrySync,
   findActiveEntry,
   type TimeEntry,
 } from "./csv";
@@ -256,6 +258,47 @@ describe("addEntry", () => {
     expect(entries).toHaveLength(2);
     expect(entries[0]).toEqual(sampleEntry);
     expect(entries[1]).toEqual(newEntry);
+  });
+});
+
+describe("finalizeEntrySync", () => {
+  it("should synchronously finalize an active entry", async () => {
+    await writeEntries([{ ...sampleEntry, end: "" }]);
+
+    const didFinalize = finalizeEntrySync(0, "2025-01-15T12:00:00.000Z");
+    const entries = await readEntries();
+
+    expect(didFinalize).toBe(true);
+    expect(entries[0]!.end).toBe("2025-01-15T12:00:00.000Z");
+  });
+
+  it("should be idempotent for completed entries", async () => {
+    await writeEntries([sampleEntry]);
+
+    const didFinalize = finalizeEntrySync(0, "2025-01-15T12:00:00.000Z");
+    const entries = await readEntries();
+
+    expect(didFinalize).toBe(false);
+    expect(entries[0]!.end).toBe(sampleEntry.end);
+  });
+});
+
+describe("updateEntrySync", () => {
+  it("should synchronously update an entry", async () => {
+    await writeEntries([sampleEntry]);
+
+    const didUpdate = updateEntrySync(tempDir, 0, { title: "Updated task" });
+    const entries = await readEntries();
+
+    expect(didUpdate).toBe(true);
+    expect(entries[0]!.title).toBe("Updated task");
+    expect(entries[0]!.end).toBe(sampleEntry.end);
+  });
+
+  it("should return false for out of bounds indexes", async () => {
+    await writeEntries([sampleEntry]);
+
+    expect(updateEntrySync(tempDir, 1, { title: "Nope" })).toBe(false);
   });
 });
 

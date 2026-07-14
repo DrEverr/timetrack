@@ -1,22 +1,45 @@
-export function formatElapsedTime(startISO: string): string {
+function getElapsedParts(startISO: string, end: Date = new Date()): {
+  hours: number;
+  minutes: number;
+  seconds: number;
+} {
   const start = new Date(startISO);
-  const now = new Date();
-  const diffMs = now.getTime() - start.getTime();
+  const diffMs = end.getTime() - start.getTime();
 
-  const seconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
+  const totalSeconds = Math.max(0, Math.floor(diffMs / 1000));
+  const totalMinutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
 
-  const hrs = hours;
-  const mins = minutes % 60;
-  const secs = seconds % 60;
+  return {
+    hours,
+    minutes: totalMinutes % 60,
+    seconds: totalSeconds % 60,
+  };
+}
+
+export function formatElapsedTime(startISO: string): string {
+  const { hours, minutes, seconds } = getElapsedParts(startISO);
 
   const parts: string[] = [];
-  if (hrs > 0) parts.push(`${hrs}h`);
-  if (mins > 0) parts.push(`${mins}m`);
-  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
 
   return parts.join(" ");
+}
+
+export function formatElapsedCompact(startISO: string): string {
+  const { hours, minutes, seconds } = getElapsedParts(startISO);
+
+  if (hours > 0) {
+    return minutes > 0 ? `${hours}h${minutes}m` : `${hours}h`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m`;
+  }
+
+  return `${Math.max(0, seconds)}s`;
 }
 
 export function getCurrentUser(): string {
@@ -24,22 +47,12 @@ export function getCurrentUser(): string {
 }
 
 export function calculateDuration(startISO: string, endISO: string): string {
-  const start = new Date(startISO);
-  const end = new Date(endISO);
-  const diffMs = end.getTime() - start.getTime();
-
-  const seconds = Math.floor(diffMs / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-
-  const hrs = hours;
-  const mins = minutes % 60;
-  const secs = seconds % 60;
+  const { hours, minutes, seconds } = getElapsedParts(startISO, new Date(endISO));
 
   const parts: string[] = [];
-  if (hrs > 0) parts.push(`${hrs}h`);
-  if (mins > 0) parts.push(`${mins}m`);
-  if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}s`);
 
   return parts.join(" ");
 }

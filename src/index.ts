@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { startTracking, stopTracking, resumeTracking, showStatus, listEntries, type DateFilter } from "./commands";
+import { runRepl } from "./repl";
 import pkg from "../package.json";
 
 /**
@@ -16,11 +17,22 @@ function parseInterval(interval?: string | boolean): number | undefined {
 }
 
 const program = new Command();
+program.enablePositionalOptions();
 
 program
   .name("track")
   .description("Minimal, zero-config CLI time tracker.")
-  .version(pkg.version);
+  .version(pkg.version)
+  .argument("[title]", "optional title for the REPL session")
+  .option("-p, --project <name>", "assign a project to the REPL session")
+  .action(async (title?: string, options?: { project?: string }) => {
+    try {
+      await runRepl({ title, project: options?.project });
+    } catch (error) {
+      console.error("Error:", error instanceof Error ? error.message : error);
+      process.exit(1);
+    }
+  });
 
 program
   .command("start")

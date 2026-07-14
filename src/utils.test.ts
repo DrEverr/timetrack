@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
 import {
   formatElapsedTime,
+  formatElapsedCompact,
   getCurrentUser,
   calculateDuration,
   formatDate,
@@ -51,6 +52,23 @@ describe("formatElapsedTime", () => {
     const start = new Date(Date.now() - 2 * 3600 * 1000);
     const result = formatElapsedTime(start.toISOString());
     expect(result).toBe("2h");
+  });
+});
+
+describe("formatElapsedCompact", () => {
+  it("should return compact seconds below a minute", () => {
+    const start = new Date(Date.now() - 45 * 1000);
+    expect(formatElapsedCompact(start.toISOString())).toBe("45s");
+  });
+
+  it("should return compact minutes below an hour", () => {
+    const start = new Date(Date.now() - (23 * 60 + 30) * 1000);
+    expect(formatElapsedCompact(start.toISOString())).toBe("23m");
+  });
+
+  it("should return compact hours and minutes", () => {
+    const start = new Date(Date.now() - (2 * 3600 + 15 * 60) * 1000);
+    expect(formatElapsedCompact(start.toISOString())).toBe("2h15m");
   });
 });
 

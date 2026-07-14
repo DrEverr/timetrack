@@ -8,6 +8,10 @@ Minimal CLI time tracker tool built with TypeScript and Bun.
 
 Features:
 
+- Start a tracked work session with bare `track`
+- Run normal shell commands from the tracking REPL
+- Stop automatically with `Ctrl+C`, `Ctrl+D`, or `/quit`
+- Set task name and project during a session with slash commands
 - Start and stop time tracking with optional task titles
 - Resume the last stopped timer with a single command
 - Assign entries to projects with `--project` for organized tracking
@@ -72,6 +76,42 @@ bun link
 The `track` command is now available globally on your system.
 
 ## Usage
+
+### Start an interactive work session
+
+Run `track` with no subcommand to start timing immediately and enter the tracking REPL:
+
+```bash
+track
+```
+
+Optionally set an initial title or project:
+
+```bash
+track "Writing docs" --project cli
+track "Fix login bug" -p frontend
+```
+
+Inside the REPL, lines starting with `/` are track commands:
+
+```text
+/name Writing docs
+/project cli
+/status
+/list
+/help
+/quit
+```
+
+Any other line runs in your shell. `cd` is handled by the REPL so later commands use the new directory:
+
+```text
+cd src
+bun test
+git status
+```
+
+The timer is written to the `timetrack.csv` file in the directory where `track` was launched, even if you `cd` inside the REPL. Exit with `Ctrl+C`, `Ctrl+D`, or `/quit` to stop the timer.
 
 ### Start tracking
 

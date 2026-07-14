@@ -1,4 +1,4 @@
-import { existsSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
 import { join } from "path";
 
@@ -13,18 +13,37 @@ export interface TimeEntry {
 const CSV_FILENAME = "timetrack.csv";
 const CSV_HEADER = "user,title,project,start,end";
 
-function getCsvPath(): string {
-  return join(process.cwd(), CSV_FILENAME);
+export function getCsvPath(baseDir = process.cwd()): string {
+  return join(baseDir, CSV_FILENAME);
 }
 
 export async function readEntries(): Promise<TimeEntry[]> {
-  const csvPath = getCsvPath();
+  return readEntriesAt(process.cwd());
+}
+
+export async function readEntriesAt(baseDir: string): Promise<TimeEntry[]> {
+  const csvPath = getCsvPath(baseDir);
 
   if (!existsSync(csvPath)) {
     return [];
   }
 
   const content = await readFile(csvPath, "utf-8");
+  return parseCSVContent(content);
+}
+
+export function readEntriesSync(baseDir = process.cwd()): TimeEntry[] {
+  const csvPath = getCsvPath(baseDir);
+
+  if (!existsSync(csvPath)) {
+    return [];
+  }
+
+  const content = readFileSync(csvPath, "utf-8");
+  return parseCSVContent(content);
+}
+
+function parseCSVContent(content: string): TimeEntry[] {
   const lines = content.trim().split("\n");
 
   if (lines.length <= 1) {
@@ -58,31 +77,85 @@ export async function readEntries(): Promise<TimeEntry[]> {
 }
 
 export async function writeEntries(entries: TimeEntry[]): Promise<void> {
-  const csvPath = getCsvPath();
+  await writeEntriesAt(process.cwd(), entries);
+}
+
+export async function writeEntriesAt(baseDir: string, entries: TimeEntry[]): Promise<void> {
+  const csvPath = getCsvPath(baseDir);
+  await writeFile(csvPath, formatCSVContent(entries), "utf-8");
+}
+
+export function writeEntriesSync(baseDir: string, entries: TimeEntry[]): void {
+  const csvPath = getCsvPath(baseDir);
+  writeFileSync(csvPath, formatCSVContent(entries), "utf-8");
+}
+
+function formatCSVContent(entries: TimeEntry[]): string {
   const lines = [CSV_HEADER];
 
   for (const entry of entries) {
     lines.push(formatCSVLine(entry));
   }
 
-  await writeFile(csvPath, lines.join("\n") + "\n", "utf-8");
+  return lines.join("\n") + "\n";
 }
 
 export async function addEntry(entry: TimeEntry): Promise<void> {
-  const entries = await readEntries();
+  await addEntryAt(process.cwd(), entry);
+}
+
+export async function addEntryAt(baseDir: string, entry: TimeEntry): Promise<number> {
+  const entries = await readEntriesAt(baseDir);
   entries.push(entry);
-  await writeEntries(entries);
+  await writeEntriesAt(baseDir, entries);
+  return entries.length - 1;
 }
 
 export async function updateEntry(
   index: number,
   updates: Partial<TimeEntry>
 ): Promise<void> {
-  const entries = await readEntries();
+  await updateEntryAt(process.cwd(), index, updates);
+}
+
+export async function updateEntryAt(
+  baseDir: string,
+  index: number,
+  updates: Partial<TimeEntry>
+): Promise<void> {
+  const entries = await readEntriesAt(baseDir);
   if (index >= 0 && index < entries.length) {
     entries[index] = { ...entries[index]!, ...updates };
-    await writeEntries(entries);
+    await writeEntriesAt(baseDir, entries);
   }
+}
+
+export function updateEntrySync(
+  baseDir: string,
+  index: number,
+  updates: Partial<TimeEntry>
+): boolean {
+  const entries = readEntriesSync(baseDir);
+  if (index < 0 || index >= entries.length) {
+    return false;
+  }
+
+  entries[index] = { ...entries[index]!, ...updates };
+  writeEntriesSync(baseDir, entries);
+  return true;
+}
+
+export function finalizeEntrySync(index: number, end: string, baseDir = process.cwd()): boolean {
+  const entries = readEntriesSync(baseDir);
+  const entry = entries[index];
+
+  if (!entry || entry.end) {
+    return false;
+  }
+
+  entries[index] = { ...entry, end };
+  writeEntriesSync(baseDir, entries);
+  return true;
 }
 
 export function findActiveEntry(entries: TimeEntry[]): {
